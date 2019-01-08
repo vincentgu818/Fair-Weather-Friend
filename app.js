@@ -1,5 +1,20 @@
+
+let weatherData = []
+
+const daysOfMonths = { jan: 31, feb: 28, mar: 31, apr: 30, may: 31, jun: 30,
+                        jul: 31, aug: 31, sep: 30, oct: 31, nov: 30, dec: 31}
+
+const convertKToF = (kelvin) => {
+  return (kelvin-273.15)*9/5+32;
+}
+
 $(() => {
-  const renderWeather = (data) => {
+  const storeOWMWeather = (data) => {
+    console.log(data);
+    for(obj of data.list) {
+      weatherData.push({time: obj.dt_txt, temp: obj.main.temp, humid: obj.main.humidity,
+        rain: obj.rain['3h'], snow: obj.snow['3h'], clouds: obj.clouds.all, wind: obj.wind.speed});
+    }
   }
 
 
@@ -13,7 +28,7 @@ $(() => {
         dataType: 'jsonp'
       }
     ).then(
-      renderWeather,
+      storeOWMWeather,
       ()=>{ console.log('bad request'); }
     );
 });
