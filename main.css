@@ -1,3 +1,8 @@
+#container {
+  display: flex;
+  justify-content: center;
+}
+
 .day {
   display: flex;
   flex-direction: column;
@@ -5,5 +10,5 @@
 
 .day > div {
   width: 100px;
-  height: 50px;
+  height: 20px;
 }
