@@ -1,11 +1,11 @@
-let darkSkyData = [];
-let OWMData = [];
+let darkSkyData = {};
+let OWMData = {};
 
-const convertKToF = (kelvin) => {
+const convertKtoF = (kelvin) => {
   return (kelvin-273.15)*9/5+32;
 }
 
-const convertUnixGMTToLocalTime = (unix) => {
+const convertUnixTime = (unix) => {
   const daysOfMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   let yearLen =  60*60*24*365;
   let dayLen = 60*60*24;
@@ -43,41 +43,42 @@ const convertUnixGMTToLocalTime = (unix) => {
   unix = unix%60;
   if(min < 10) min = '0'+min;
 
-  sec = unix;
+  sec = Math.round(unix);
   if(sec < 10) sec = '0'+sec;
 
-  return `${year}-${month}-${day} ${hour}:${min}:${sec}`;
+  return `${year}-${month}-${day}T${hour}:${min}:${sec}`;
 }
 
 $(() => {
-  const storeOWMWeather = (data) => {
+  const storeOWM = (data) => {
+    console.log(data);
     for(obj of data.list) {
-      OWMData.push(
+      OWMData[obj.dt.toString()] =
         {
-          time: obj.dt_txt,
-          temp: obj.main.temp,
+          summary: obj.weather[0].main,
+          temp: convertKtoF(obj.main.temp),
           humid: obj.main.humidity,
-          rain: obj.rain['3h'],
-          snow: obj.snow['3h'],
           cloud: obj.clouds.all,
+          precip: Math.max(obj.rain['3h'],obj.snow['3h']),
           wind: obj.wind.speed
-        }
-      );
+        };
     }
   }
 
-  const storeDarkSkyWeather = (data) => {
+  const storeDarkSky = (data) => {
+    console.log(data);
     for(obj of data.hourly.data) {
-      darkSkyData.push(
+      darkSkyData[obj.time.toString()] =
         {
-          time: obj.time,
           summary: obj.summary,
           temp: obj.apparentTemperature,
           humid: obj.humidity,
           cloud: obj.cloudCover,
+          precip: obj.precipIntensity*obj.precipProbability,
           wind: obj.windSpeed,
-        }
-      );
+          uv: obj.uvIndex
+        };
+
     }
   }
 
@@ -95,11 +96,31 @@ $(() => {
       }
     }
 
+    // const myWeatherPrefs = {
+    //   tempGreat: 25,
+    //   cloudLess: .8,
+    //   windLess: 10,
+    //   precipLess: .01
+    // }
+
+    let unixDay = Math.floor(new Date(Date.now()).setHours(0,0,0)/1000);
     for(let i=1; i<=6; i++) {
-      $('<div>').text(`Day ${i}`).appendTo($(`#day${i}`));
+      let day = convertUnixTime(unixDay).substr(0,10);
+      $('<div>').text(day).appendTo($(`#day${i}`));
+
+      //iterate through the hours of each day
       for(let j=0; j<24; j++) {
-        $('<div>').css('background-color','green').appendTo($(`#day${i}`));
+        const currTime = unixDay+j*60*60;
+        const $weathSlot = $('<div>').attr('id',currTime).appendTo($(`#day${i}`));
+        if(typeof darkSkyData[currTime.toString()] !== 'undefined') {
+          $weathSlot.text(darkSkyData[currTime.toString()].summary);
+        } else if(typeof OWMData[currTime.toString()] !== 'undefined') {
+          $weathSlot.text(OWMData[currTime.toString()].summary);
+        }
       }
+
+      //increment the day
+      unixDay = unixDay+24*60*60;
     }
   }
 
@@ -114,9 +135,24 @@ $(() => {
         dataType: 'jsonp'
       }
     ).then(
-      storeDarkSkyWeather,
+      storeDarkSky,
       ()=>{ console.log('bad request'); }
     );
-  drawCalendar();
+
+    $.ajax(
+      {
+        url: 'http://api.openweathermap.org/data/2.5/forecast?zip=01982&APPID=e4e6249c02c0a4cea28c0cc7541e8796',
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type':'application/json'
+        },
+        dataType: 'jsonp'
+      }
+    ).then(
+      storeOWM,
+      ()=>{ console.log('bad request'); }
+    );
+
+  setTimeout(drawCalendar,10000);
 
 });
