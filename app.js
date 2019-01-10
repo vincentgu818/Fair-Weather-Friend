@@ -1,5 +1,13 @@
 let darkSkyData = {};
 let OWMData = {};
+let cities = {
+  elpaso: { zip: 79936, latlng: '31.776593,-106.296976' },
+  losangeles: { zip: 90011, latlng: '34.007090,-118.258681' },
+  chicago: { zip: 60629, latlng: '41.775868,-87.711496' },
+  houston: { zip: 77084, latlng: '29.827486,-95.659920' },
+  newyork: { zip: 10025, latlng: '40.798601,-73.966622' },
+  hamilton: { zip: 01982, latlng: '42.6085869,-70.8413316' }
+}
 
 const convertKtoF = (kelvin) => {
   return (kelvin-273.15)*9/5+32;
@@ -20,10 +28,12 @@ const convertUnixTime = (unix) => {
 
   while(unix > yearLen) {
     if(year%4 !== 0) unix -= yearLen;
+    //account for leap years
     else unix -= (yearLen + dayLen);
     year++;
   }
 
+  //account for leap days
   if(year%4 === 0) daysOfMonths[1] = 29;
   while(unix > daysOfMonths[month-1]*dayLen) {
     unix -= daysOfMonths[month-1]*dayLen;
@@ -54,7 +64,9 @@ $(() => {
     for(obj of data.list) {
       let rain = 0;
       let snow = 0;
+      //check if the API is supplying the field
       if(typeof obj['rain'] !== 'undefined') {
+        //convert from mm to in
         if(Object.keys(obj.rain).length !== 0) rain = obj.rain['3h']/(25.4*3);
       }
       if(typeof obj['snow'] !== 'undefined') {
@@ -68,7 +80,8 @@ $(() => {
           humid: obj.main.humidity,
           cloud: obj.clouds.all/100,
           precip: Math.max(rain,snow),
-          wind: obj.wind.speed
+          wind: obj.wind.speed,
+          uv: Math.round((1-obj.clouds.all/100)*6)
         };
     }
   }
@@ -86,26 +99,26 @@ $(() => {
           uv: obj.uvIndex
         };
     }
-    console.log(darkSkyData);
   }
 
   const checkWeath = (data, prefs) => {
+    let metPrefs = Object.keys(prefs).length;
     for(pref of Object.keys(prefs)) {
       if(pref.indexOf('Less') !== -1) {
         const aspect = pref.substring(0,pref.indexOf('Less'));
         if(data[aspect] > prefs[pref]) {
           console.log(`${aspect} is not less than ${prefs[pref]}`);
-          return false;
+          metPrefs--;
         }
       } else if (pref.indexOf('Great') !== -1) {
         const aspect = pref.substring(0,pref.indexOf('Great'));
         if(data[aspect] < prefs[pref]) {
           console.log(`${aspect} is not greater than ${prefs[pref]}`);
-          return false;
+          metPrefs--;
         }
       }
     }
-    return true;
+    return metPrefs/Object.keys(prefs).length;
   }
 
   const drawCalendar = () => {
@@ -118,19 +131,22 @@ $(() => {
         let end = (j+1)+suffix;
         if(j === 11 && suffix === 'A') end = '12P';
         else if(j === 11 && suffix === 'P') end = '12A';
-        $('<div>').text(`${start}-${end}`).appendTo($('#time'));
+        $('<div>').text(`${start}`).appendTo($('#time'));
       }
     }
 
     const myPrefs = {
-       cloudGreat: .25,
-       windLess: 15,
-       precipLess: .01
+       tempGreat: 50,
+       windLess: 8,
+       precipLess: 0,
+       cloudGreat: 0,
+       humidLess: .9,
+       uvLess: 9
     }
 
     let unixDay = Math.floor(new Date(Date.now()).setHours(0,0,0)/1000);
     for(let i=1; i<=6; i++) {
-      let day = convertUnixTime(unixDay).substr(0,10);
+      let day = convertUnixTime(unixDay).substring(5,10);
       $('<div>').text(day).appendTo($(`#day${i}`));
 
       //iterate through the hours of each day
@@ -138,19 +154,17 @@ $(() => {
         const currTime = unixDay+j*60*60;
         const $weathSlot = $('<div>').attr('id',currTime).appendTo($(`#day${i}`));
         if(typeof darkSkyData[currTime.toString()] !== 'undefined') {
-          // $weathSlot.text(darkSkyData[currTime.toString()].summary);
-          if(checkWeath(darkSkyData[currTime.toString()],myPrefs)) {
-            $weathSlot.css('background-color','green');
-          }
-          else {
-            $weathSlot.css('background-color','gray');
-          }
+          let prefMatch = checkWeath(darkSkyData[currTime.toString()],myPrefs);
+          $weathSlot.css('background-color',`rgb(0,${prefMatch*255},0)`);
         } else if(typeof OWMData[currTime.toString()] !== 'undefined') {
-          $weathSlot.text(OWMData[currTime.toString()].summary);
+          let prefMatch = checkWeath(OWMData[currTime.toString()],myPrefs);
+          $weathSlot.css('background-color',`rgb(0,${prefMatch*255},0)`);
         } else if(typeof OWMData[(currTime-60*60).toString()] !== 'undefined') {
-          $weathSlot.text(OWMData[(currTime-60*60).toString()].summary);
+          let prefMatch = checkWeath(OWMData[(currTime-60*60).toString()],myPrefs);
+          $weathSlot.css('background-color',`rgb(0,${prefMatch*255},0)`);
         } else if(typeof OWMData[(currTime+60*60).toString()] !== 'undefined') {
-          $weathSlot.text(OWMData[(currTime+60*60).toString()].summary);
+          let prefMatch = checkWeath(OWMData[(currTime+60*60).toString()],myPrefs);
+          $weathSlot.css('background-color',`rgb(0,${prefMatch*255},0)`);
         }
       }
 
@@ -159,34 +173,34 @@ $(() => {
     }
   }
 
+  const city = 'houston';
   $.ajax(
-      {
-        // url: 'http://api.openweathermap.org/data/2.5/forecast?zip=01982&APPID=e4e6249c02c0a4cea28c0cc7541e8796',
-        url: 'https://api.darksky.net/forecast/68e294c9a2e58cfb2ef5efd86a1c702c/42.6085869,-70.8413316?units=us',
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Content-Type':'application/json'
-        },
-        dataType: 'jsonp'
-      }
-    ).then(
-      storeDarkSky,
-      ()=>{ console.log('bad request'); }
-    );
+    {
+      url: `https://api.darksky.net/forecast/68e294c9a2e58cfb2ef5efd86a1c702c/${cities[city].latlng}?units=us`,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type':'application/json'
+      },
+      dataType: 'jsonp'
+    }
+  ).then(
+    storeDarkSky,
+    ()=>{ console.log('bad request'); }
+  );
 
-    $.ajax(
-      {
-        url: 'http://api.openweathermap.org/data/2.5/forecast?zip=01982&APPID=e4e6249c02c0a4cea28c0cc7541e8796',
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type':'application/json'
-        },
-        dataType: 'jsonp'
-      }
-    ).then(
-      storeOWM,
-      ()=>{ console.log('bad request'); }
-    );
+  $.ajax(
+    {
+      url: `http://api.openweathermap.org/data/2.5/forecast?zip=${cities[city].zip}&APPID=e4e6249c02c0a4cea28c0cc7541e8796`,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type':'application/json'
+      },
+      dataType: 'jsonp'
+    }
+  ).then(
+    storeOWM,
+    ()=>{ console.log('bad request'); }
+  );
 
   setTimeout(drawCalendar,5000);
 
