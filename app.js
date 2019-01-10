@@ -51,22 +51,29 @@ const convertUnixTime = (unix) => {
 
 $(() => {
   const storeOWM = (data) => {
-    console.log(data);
     for(obj of data.list) {
+      let rain = 0;
+      let snow = 0;
+      if(typeof obj['rain'] !== 'undefined') {
+        if(Object.keys(obj.rain).length !== 0) rain = obj.rain['3h']/(25.4*3);
+      }
+      if(typeof obj['snow'] !== 'undefined') {
+        if(Object.keys(obj.snow).length !== 0) snow = obj.snow['3h']/(25.4*3);
+      }
+
       OWMData[obj.dt.toString()] =
         {
           summary: obj.weather[0].main,
           temp: convertKtoF(obj.main.temp),
           humid: obj.main.humidity,
-          cloud: obj.clouds.all,
-          precip: Math.max(obj.rain['3h'],obj.snow['3h']),
+          cloud: obj.clouds.all/100,
+          precip: Math.max(rain,snow),
           wind: obj.wind.speed
         };
     }
   }
 
   const storeDarkSky = (data) => {
-    console.log(data);
     for(obj of data.hourly.data) {
       darkSkyData[obj.time.toString()] =
         {
@@ -78,8 +85,27 @@ $(() => {
           wind: obj.windSpeed,
           uv: obj.uvIndex
         };
-
     }
+    console.log(darkSkyData);
+  }
+
+  const checkWeath = (data, prefs) => {
+    for(pref of Object.keys(prefs)) {
+      if(pref.indexOf('Less') !== -1) {
+        const aspect = pref.substring(0,pref.indexOf('Less'));
+        if(data[aspect] > prefs[pref]) {
+          console.log(`${aspect} is not less than ${prefs[pref]}`);
+          return false;
+        }
+      } else if (pref.indexOf('Great') !== -1) {
+        const aspect = pref.substring(0,pref.indexOf('Great'));
+        if(data[aspect] < prefs[pref]) {
+          console.log(`${aspect} is not greater than ${prefs[pref]}`);
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   const drawCalendar = () => {
@@ -96,12 +122,11 @@ $(() => {
       }
     }
 
-    // const myWeatherPrefs = {
-    //   tempGreat: 25,
-    //   cloudLess: .8,
-    //   windLess: 10,
-    //   precipLess: .01
-    // }
+    const myPrefs = {
+       cloudGreat: .25,
+       windLess: 15,
+       precipLess: .01
+    }
 
     let unixDay = Math.floor(new Date(Date.now()).setHours(0,0,0)/1000);
     for(let i=1; i<=6; i++) {
@@ -113,9 +138,19 @@ $(() => {
         const currTime = unixDay+j*60*60;
         const $weathSlot = $('<div>').attr('id',currTime).appendTo($(`#day${i}`));
         if(typeof darkSkyData[currTime.toString()] !== 'undefined') {
-          $weathSlot.text(darkSkyData[currTime.toString()].summary);
+          // $weathSlot.text(darkSkyData[currTime.toString()].summary);
+          if(checkWeath(darkSkyData[currTime.toString()],myPrefs)) {
+            $weathSlot.css('background-color','green');
+          }
+          else {
+            $weathSlot.css('background-color','gray');
+          }
         } else if(typeof OWMData[currTime.toString()] !== 'undefined') {
           $weathSlot.text(OWMData[currTime.toString()].summary);
+        } else if(typeof OWMData[(currTime-60*60).toString()] !== 'undefined') {
+          $weathSlot.text(OWMData[(currTime-60*60).toString()].summary);
+        } else if(typeof OWMData[(currTime+60*60).toString()] !== 'undefined') {
+          $weathSlot.text(OWMData[(currTime+60*60).toString()].summary);
         }
       }
 
@@ -127,7 +162,7 @@ $(() => {
   $.ajax(
       {
         // url: 'http://api.openweathermap.org/data/2.5/forecast?zip=01982&APPID=e4e6249c02c0a4cea28c0cc7541e8796',
-        url: 'https://api.darksky.net/forecast/68e294c9a2e58cfb2ef5efd86a1c702c/42.6085869,-70.8413316',
+        url: 'https://api.darksky.net/forecast/68e294c9a2e58cfb2ef5efd86a1c702c/42.6085869,-70.8413316?units=us',
         headers: {
             'Access-Control-Allow-Origin': '*',
             'Content-Type':'application/json'
@@ -153,6 +188,6 @@ $(() => {
       ()=>{ console.log('bad request'); }
     );
 
-  setTimeout(drawCalendar,10000);
+  setTimeout(drawCalendar,5000);
 
 });
