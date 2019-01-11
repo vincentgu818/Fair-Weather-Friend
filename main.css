@@ -1,10 +1,20 @@
+body {
+  font-family: Arial, sans-serif;
+  color: white;
+  background-color: gray;
+}
+
 #container {
   display: flex;
   justify-content: space-between;
 }
 
+#input_fields {
+  font-size: 24px;
+}
+
 input {
-  width: 30px;
+  width: 35px;
 }
 
 #cities {
@@ -27,10 +37,8 @@ button {
 }
 
 .day > div {
-  font-family: Arial, sans-serif;
-  color: white;
   width: 50px;
   height: 20px;
   text-align: right;
-  border: 0.5px solid black;
+  border: 0.5px solid gray;
 }

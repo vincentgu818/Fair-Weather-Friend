@@ -1,20 +1,20 @@
 let darkSkyData = {};
 let OWMData = {};
 let cities = {
-  elpaso: { zip: 79936, latlng: '31.776593,-106.296976' },
-  newyork: { zip: 10025, latlng: '40.798601,-73.966622' },
-  losangeles: { zip: 90011, latlng: '34.007090,-118.258681' },
-  chicago: { zip: 60629, latlng: '41.775868,-87.711496' },
-  houston: { zip: 77084, latlng: '29.827486,-95.659920' },
-  philadelphia: { zip: 19120, latlng: '40.034147,-75.119198' },
-  phoenix: { zip: 85032, latlng: '33.625920,-112.002503' },
-  sanantonio: { zip: 78245, latlng: '29.401093,-98.730806' },
-  sandiego: { zip: 92154, latlng: '32.557022,-117.006214' },
-  dallas: { zip: 75217, latlng: '32.710306,-96.678549' },
-  sanfrancisco: { zip: 94112, latlng: '37.720375,-122.442950' },
-  seattle: { zip: 98115, latlng: '47.685746,-122.281589' },
-  boston: { zip: 02128, latlng: '42.361129,-71.006975' },
-  hamilton: { zip: 01982, latlng: '42.6085869,-70.8413316' }
+  elpaso: { zip: '79936', latlng: '31.776593,-106.296976' },
+  newyork: { zip: '10025', latlng: '40.798601,-73.966622' },
+  losangeles: { zip: '90011', latlng: '34.007090,-118.258681' },
+  chicago: { zip: '60629', latlng: '41.775868,-87.711496' },
+  houston: { zip: '77084', latlng: '29.827486,-95.659920' },
+  philadelphia: { zip: '19120', latlng: '40.034147,-75.119198' },
+  phoenix: { zip: '85032', latlng: '33.625920,-112.002503' },
+  sanantonio: { zip: '78245', latlng: '29.401093,-98.730806' },
+  sandiego: { zip: '92154', latlng: '32.557022,-117.006214' },
+  dallas: { zip: '75217', latlng: '32.710306,-96.678549' },
+  sanfrancisco: { zip: '94112', latlng: '37.720375,-122.442950' },
+  seattle: { zip: '98115', latlng: '47.685746,-122.281589' },
+  boston: { zip: '02128', latlng: '42.361129,-71.006975' },
+  hamilton: { zip: '01982', latlng: '42.6085869,-70.8413316' }
 }
 let offset = -5;
 
@@ -112,29 +112,37 @@ $(() => {
     }
   }
 
-  const checkWeath = (data, prefs) => {
-    let metPrefs = Object.keys(prefs).length;
-    for(pref of Object.keys(prefs)) {
-      if(pref.indexOf('Less') !== -1) {
-        const aspect = pref.substring(0,pref.indexOf('Less'));
-        if(data[aspect] > prefs[pref]) {
-          console.log(`${aspect} is not less than ${prefs[pref]}`);
-          metPrefs--;
+  const checkWeath = (data, criteria) => {
+    let metCrits = Object.keys(criteria).length;
+    for(crit of Object.keys(criteria)) {
+      // if(crit.indexOf('Less') !== -1) {
+      //   const weathPart = crit.substring(0,crit.indexOf('Less'));
+      //   if(data[weathPart] > criteria[crit]) {
+      //     console.log(`${weathPart} is not less than ${criteria[crit]}`);
+      //     metCrits--;
+      //   }
+      // } else if(crit.indexOf('Great') !== -1) {
+      //   const weathPart = crit.substring(0,crit.indexOf('Great'));
+      //   if(data[weathPart] < criteria[crit]) {
+      //     console.log(`${weathPart} is not greater than ${criteria[crit]}`);
+      //     metCrits--;
+      //   }
+      // } else if(crit.indexOf('Tween') !== -1) {
+        const weathPart = crit;
+        const lower = criteria[crit].split('-')[0];
+        const upper = criteria[crit].split('-')[1];
+        if(data[weathPart] < lower || data[weathPart] > upper) {
+          console.log(`${weathPart} is not between ${lower} & ${upper}`);
+          metCrits--;
         }
-      } else if (pref.indexOf('Great') !== -1) {
-        const aspect = pref.substring(0,pref.indexOf('Great'));
-        if(data[aspect] < prefs[pref]) {
-          console.log(`${aspect} is not greater than ${prefs[pref]}`);
-          metPrefs--;
-        }
-      }
     }
-    return metPrefs/Object.keys(prefs).length;
+    //Return the proportion of criteria met by the forecast
+    return metCrits/Object.keys(criteria).length;
   }
 
   const drawCalendar = () => {
     //draw time column
-    $('<div>').css('background-color','black').appendTo($('#time'))
+    $('<div>').appendTo($('#time'))
     for(let i=0; i<2; i++) {
       let suffix = (i === 0) ? 'A' : 'P';
       for(let j=0; j<12; j++) {
@@ -142,15 +150,81 @@ $(() => {
         let end = (j+1)+suffix;
         if(j === 11 && suffix === 'A') end = '12P';
         else if(j === 11 && suffix === 'P') end = '12A';
-        $('<div>').text(`${start}`).css('background-color','black').appendTo($('#time'));
+        $('<div>').text(`${start}`).appendTo($('#time'));
       }
     }
+
+    //determine the start of the local day in unix time
+    let unixDay = Math.floor(new Date(Date.now()).setHours(0,0,0)/1000)-(offset+5)*60*60;
+    for(let i=1; i<=6; i++) {
+      //draw column header
+      let day = convertUnixTime(unixDay).substring(5,10);
+      $('<div>').text(day).appendTo($(`#day${i}`));
+
+      //increment the day
+      unixDay = unixDay+24*60*60;
+    }
+  }
+
+  const populateCalendar = (ev) => {
+    const city = $(ev.currentTarget).attr('id');
+
+    $.ajax(
+      {
+        url: `https://api.darksky.net/forecast/68e294c9a2e58cfb2ef5efd86a1c702c/${cities[city].latlng}?units=us`,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type':'application/json'
+        },
+        dataType: 'jsonp'
+      }
+    ).then(
+      storeDarkSky,
+      ()=>{ console.log('bad request'); }
+    );
+
+    $.ajax(
+      {
+        url: `http://api.openweathermap.org/data/2.5/forecast?zip=${cities[city].zip}&APPID=e4e6249c02c0a4cea28c0cc7541e8796`,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type':'application/json'
+        },
+        dataType: 'jsonp'
+      }
+    ).then(
+      storeOWM,
+      ()=>{ console.log('bad request'); }
+    );
+
+    const maxTemp = $('#temp_max').val() ? $('#temp_max').val() : "Infinity";
+    const minTemp = $('#temp_min').val() ? $('#temp_min').val() : "-Infinity";
+    const maxPrecip = $('#precip_max').val() ? $('#precip_max').val() : "Infinity";
+    const minPrecip = $('#precip_min').val() ? $('#precip_min').val() : "-Infinity";
+    const maxWind = $('#wind_max').val() ? $('#wind_max').val() : "Infinity";
+    const minWind = $('#wind_min').val() ? $('#wind_min').val() : "-Infinity";
+    const maxCloud = $('#cloud_max').val() ? $('#cloud_max').val() : "Infinity";
+    const minCloud = $('#cloud_min').val() ? $('#cloud_min').val() : "-Infinity";
+    const maxHumid = $('#humid_max').val() ? $('#humid_max').val() : "Infinity";
+    const minHumid = $('#humid_min').val() ? $('#humid_min').val() : "-Infinity";
+    const maxUV = $('#uv_max').val() ? $('#uv_max').val() : "Infinity";
+    const minUV = $('#uv_min').val() ? $('#uv_min').val() : "-Infinity";
+
+    const myCriteria = {
+      temp: minTemp+'-'+maxTemp,
+      precip: minPrecip+'-'+maxPrecip,
+      wind: minWind+'-'+maxWind,
+      cloud: minCloud+'-'+maxCloud,
+      humid: minHumid+'-'+maxHumid,
+      uv: minUV+'-'+maxUV
+    };
 
     //Determine the start of the local day in unix time
     let unixDay = Math.floor(new Date(Date.now()).setHours(0,0,0)/1000)-(offset+5)*60*60;
     for(let i=1; i<=6; i++) {
+      $(`#day${i}`).empty();
       let day = convertUnixTime(unixDay).substring(5,10);
-      $('<div>').text(day).css('background-color','black').appendTo($(`#day${i}`));
+      $('<div>').text(day).appendTo($(`#day${i}`));
 
       //iterate through the hours of each day
       for(let j=0; j<24; j++) {
@@ -159,19 +233,19 @@ $(() => {
         const $weathSlot = $('<div>').attr('id',currTime).appendTo($(`#day${i}`));
         //check first for data in Dark Sky for the exact time
         if(typeof darkSkyData[currTime.toString()] !== 'undefined') {
-          let prefMatch = checkWeath(darkSkyData[currTime.toString()],myPrefs);
-          $weathSlot.css('background-color',`rgb(0,${prefMatch*255},0)`);
+          let critMatch = checkWeath(darkSkyData[currTime.toString()],myCriteria);
+          $weathSlot.css('background-color',`rgb(0,${critMatch*255},0)`);
         //then check for data in Open Weather Map for the exact time
         } else if(typeof OWMData[currTime.toString()] !== 'undefined') {
-          let prefMatch = checkWeath(OWMData[currTime.toString()],myPrefs);
-          $weathSlot.css('background-color',`rgb(0,${prefMatch*255},0)`);
+          let critMatch = checkWeath(OWMData[currTime.toString()],myCriteria);
+          $weathSlot.css('background-color',`rgb(0,${critMatch*255},0)`);
         //...or data in Open Weather Map in the preceding 3-hour interval
         } else if(typeof OWMData[(currTime-60*60).toString()] !== 'undefined') {
-          let prefMatch = checkWeath(OWMData[(currTime-60*60).toString()],myPrefs);
-          $weathSlot.css('background-color',`rgb(0,${prefMatch*255},0)`);
+          let critMatch = checkWeath(OWMData[(currTime-60*60).toString()],myCriteria);
+          $weathSlot.css('background-color',`rgb(0,${critMatch*255},0)`);
         } else if(typeof OWMData[(currTime-2*60*60).toString()] !== 'undefined') {
-          let prefMatch = checkWeath(OWMData[(currTime-2*60*60).toString()],myPrefs);
-          $weathSlot.css('background-color',`rgb(0,${prefMatch*255},0)`);
+          let critMatch = checkWeath(OWMData[(currTime-2*60*60).toString()],myCriteria);
+          $weathSlot.css('background-color',`rgb(0,${critMatch*255},0)`);
         }
       }
 
@@ -180,35 +254,8 @@ $(() => {
     }
   }
 
-  // const city = 'losangeles';
-  // $.ajax(
-  //   {
-  //     url: `https://api.darksky.net/forecast/68e294c9a2e58cfb2ef5efd86a1c702c/${cities[city].latlng}?units=us`,
-  //     headers: {
-  //       'Access-Control-Allow-Origin': '*',
-  //       'Content-Type':'application/json'
-  //     },
-  //     dataType: 'jsonp'
-  //   }
-  // ).then(
-  //   storeDarkSky,
-  //   ()=>{ console.log('bad request'); }
-  // );
-  //
-  // $.ajax(
-  //   {
-  //     url: `http://api.openweathermap.org/data/2.5/forecast?zip=${cities[city].zip}&APPID=e4e6249c02c0a4cea28c0cc7541e8796`,
-  //     headers: {
-  //       'Access-Control-Allow-Origin': '*',
-  //       'Content-Type':'application/json'
-  //     },
-  //     dataType: 'jsonp'
-  //   }
-  // ).then(
-  //   storeOWM,
-  //   ()=>{ console.log('bad request'); }
-  // );
-
+  drawCalendar();
   // setTimeout(drawCalendar,5000);
+  $('button').on('click', populateCalendar);
 
 });
