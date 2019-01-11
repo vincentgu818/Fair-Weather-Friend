@@ -1,5 +1,23 @@
 #container {
   display: flex;
+  justify-content: space-between;
+}
+
+input {
+  width: 30px;
+}
+
+#cities {
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  width: 120px;
+}
+
+#calendar {
+  display: flex;
   justify-content: center;
 }
 
@@ -9,6 +27,8 @@
 }
 
 .day > div {
+  font-family: Arial, sans-serif;
+  color: white;
   width: 50px;
   height: 20px;
   text-align: right;
