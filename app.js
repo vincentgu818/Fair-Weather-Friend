@@ -136,10 +136,10 @@ $(() => {
       //check if the API is supplying the field
       if(typeof obj['rain'] !== 'undefined') {
         //convert from mm to in
-        if(Object.keys(obj.rain).length !== 0) rain = obj.rain['3h']/(25.4*3);
+        if(Object.keys(obj.rain).length !== 0) rain = obj.rain['3h']/25.4;
       }
       if(typeof obj['snow'] !== 'undefined') {
-        if(Object.keys(obj.snow).length !== 0) snow = obj.snow['3h']/(25.4*3);
+        if(Object.keys(obj.snow).length !== 0) snow = obj.snow['3h']/25.4;
       }
 
       OWMData[obj.dt.toString()] =
@@ -150,7 +150,7 @@ $(() => {
           cloud: obj.clouds.all/100,
           precip: Math.max(rain,snow),
           wind: obj.wind.speed,
-          uv: Math.round((1-obj.clouds.all/100)*6)
+          uv: Math.round((1-obj.clouds.all/100)*5)
         };
     }
   }
@@ -174,26 +174,33 @@ $(() => {
   const fetchCriteria = () => {
     const maxTemp = $('#temp_max').val() ? $('#temp_max').val() : "Infinity";
     const minTemp = $('#temp_min').val() ? $('#temp_min').val() : "-Infinity";
+    if(maxTemp === "Infinity" && minTemp === "-Infinity") delete myCriteria.temp;
+    else myCriteria.temp = minTemp+','+maxTemp;
+
     const maxPrecip = $('#precip_max').val() ? $('#precip_max').val() : "Infinity";
     const minPrecip = $('#precip_min').val() ? $('#precip_min').val() : "-Infinity";
+    if(maxPrecip === "Infinity" && minPrecip === "-Infinity") delete myCriteria.precip;
+    else myCriteria.precip = minPrecip+','+maxPrecip;
+
     const maxWind = $('#wind_max').val() ? $('#wind_max').val() : "Infinity";
     const minWind = $('#wind_min').val() ? $('#wind_min').val() : "-Infinity";
+    if(maxWind === "Infinity" && minWind === "-Infinity") delete myCriteria.wind;
+    else myCriteria.wind = minWind+','+maxWind;
+
     const maxCloud = $('#cloud_max').val() ? $('#cloud_max').val() : "Infinity";
     const minCloud = $('#cloud_min').val() ? $('#cloud_min').val() : "-Infinity";
+    if(maxCloud === "Infinity" && minCloud === "-Infinity") delete myCriteria.cloud;
+    else myCriteria.cloud = minCloud+','+maxCloud;
+
     const maxHumid = $('#humid_max').val() ? $('#humid_max').val() : "Infinity";
     const minHumid = $('#humid_min').val() ? $('#humid_min').val() : "-Infinity";
+    if(maxHumid === "Infinity" && minHumid === "-Infinity") delete myCriteria.humid;
+    else myCriteria.humid = minHumid+','+maxHumid;
+
     const maxUV = $('#uv_max').val() ? $('#uv_max').val() : "Infinity";
     const minUV = $('#uv_min').val() ? $('#uv_min').val() : "-Infinity";
-
-    myCriteria = {
-      temp: minTemp+','+maxTemp,
-      precip: minPrecip+','+maxPrecip,
-      wind: minWind+','+maxWind,
-      cloud: minCloud+','+maxCloud,
-      humid: minHumid+','+maxHumid,
-      uv: minUV+','+maxUV
-    };
-    console.log(myCriteria);
+    if(maxUV === "Infinity" && minUV === "-Infinity") delete myCriteria.uv;
+    else myCriteria.uv = minUV+','+maxUV;
   }
 
   const populateCalendar = () => {
@@ -208,21 +215,27 @@ $(() => {
       for(let j=0; j<24; j++) {
         const currTime = unixDay+j*60*60;
         const $weathSlot = $('<div>').attr('id',currTime).appendTo($(`#day${i}`));
+
+        $weathSlot.addClass('tooltip');
         //check first for data in Dark Sky for the exact time
         if(typeof darkSkyData[currTime.toString()] !== 'undefined') {
           let critMatch = checkWeath(darkSkyData[currTime.toString()],myCriteria);
-          $weathSlot.css('background-color',`rgb(0,${critMatch*255},0)`);
+          $weathSlot.css('background-color',`rgb(0,${critMatch.ratio*255},0)`);
+          $('<span>').addClass('tooltiptext').html(critMatch.popup).appendTo($weathSlot);
         //then check for data in Open Weather Map for the exact time
         } else if(typeof OWMData[currTime.toString()] !== 'undefined') {
           let critMatch = checkWeath(OWMData[currTime.toString()],myCriteria);
-          $weathSlot.css('background-color',`rgb(0,${critMatch*255},0)`);
+          $weathSlot.css('background-color',`rgb(0,${critMatch.ratio*255},0)`);
+          $('<span>').addClass('tooltiptext').html(critMatch.popup).appendTo($weathSlot);
         //...or data in Open Weather Map in the preceding 3-hour interval
         } else if(typeof OWMData[(currTime-60*60).toString()] !== 'undefined') {
           let critMatch = checkWeath(OWMData[(currTime-60*60).toString()],myCriteria);
-          $weathSlot.css('background-color',`rgb(0,${critMatch*255},0)`);
+          $weathSlot.css('background-color',`rgb(0,${critMatch.ratio*255},0)`);
+          $('<span>').addClass('tooltiptext').html(critMatch.popup).appendTo($weathSlot);
         } else if(typeof OWMData[(currTime-2*60*60).toString()] !== 'undefined') {
           let critMatch = checkWeath(OWMData[(currTime-2*60*60).toString()],myCriteria);
-          $weathSlot.css('background-color',`rgb(0,${critMatch*255},0)`);
+          $weathSlot.css('background-color',`rgb(0,${critMatch.ratio*255},0)`);
+          $('<span>').addClass('tooltiptext').html(critMatch.popup).appendTo($weathSlot);
         }
       }
 
@@ -233,16 +246,18 @@ $(() => {
 
   const checkWeath = (data, criteria) => {
     let metCrits = Object.keys(criteria).length;
+    console.log(metCrits);
+    let popupMsg = data.summary;
     for(weathPart of Object.keys(criteria)) {
       const lower = criteria[weathPart].split(',')[0];
       const upper = criteria[weathPart].split(',')[1];
       if(data[weathPart] < lower || data[weathPart] > upper) {
-        console.log(`${weathPart} is not between ${lower} & ${upper}`);
         metCrits--;
       }
+      popupMsg += '<br>'+weathPart+":"+data[weathPart].toPrecision(2)+"."
     }
     //Return the proportion of criteria met by the forecast
-    return metCrits/Object.keys(criteria).length;
+    return { ratio: metCrits/Object.keys(criteria).length, popup: popupMsg };
   }
 
   const curateWeather = (ev) => {
