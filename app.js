@@ -129,7 +129,6 @@ $(() => {
   }
 
   const storeOWM = (data) => {
-    console.log(data);
     for(obj of data.list) {
       let rain = 0;
       let snow = 0;
@@ -246,15 +245,15 @@ $(() => {
 
   const checkWeath = (data, criteria) => {
     let metCrits = Object.keys(criteria).length;
-    console.log(metCrits);
     let popupMsg = data.summary;
+    //check the parts of the weather with inputted criteria
     for(weathPart of Object.keys(criteria)) {
       const lower = criteria[weathPart].split(',')[0];
       const upper = criteria[weathPart].split(',')[1];
       if(data[weathPart] < lower || data[weathPart] > upper) {
         metCrits--;
       }
-      popupMsg += '<br>'+weathPart+":"+data[weathPart].toPrecision(2)+"."
+      popupMsg += '<br>'+weathPart+":"+data[weathPart].toPrecision(2)
     }
     //Return the proportion of criteria met by the forecast
     return { ratio: metCrits/Object.keys(criteria).length, popup: popupMsg };
